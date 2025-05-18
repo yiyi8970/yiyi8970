@@ -1,0 +1,738 @@
+import * as THREE from 'three';
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x333333, 0.02);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+// Luz ambiental e iluminación direccional tipo sol
+const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+directionalLight.position.set(100, 100, 100);
+directionalLight.castShadow = true;
+scene.add(directionalLight);
+
+// Cargar textura de terreno realista
+const textureLoader = new THREE.TextureLoader();
+const groundTexture = textureLoader.load('textures/ground_diffuse.jpg');
+groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
+groundTexture.repeat.set(25, 25);
+
+const planeGeometry = new THREE.PlaneGeometry(200, 200);
+const planeMaterial = new THREE.MeshStandardMaterial({ map: groundTexture });
+const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+plane.rotation.x = -Math.PI / 2;
+scene.add(plane);
+
+// Crear tanque realista
+function createRealisticTank(colorHex) {
+  const hullMat = new THREE.MeshStandardMaterial({
+    color: colorHex,
+    metalness: 0.5,
+    roughness: 0.7
+  });
+
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(4, 1, 2), hullMat);
+  hull.castShadow = true;
+
+  const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1, 32), hullMat);
+  turret.position.set(0, 0.8, 0);
+  turret.rotation.x = Math.PI / 2;
+  turret.castShadow = true;
+  hull.add(turret);
+
+  return hull;
+}
+
+const tank1 = createRealisticTank(0x3b4c39);  // Verde militar
+tank1.position.set(-5, 0.5, 0);
+scene.add(tank1);
+
+const tank2 = createRealisticTank(0x4a3b3b);  // Gris oscuro militar
+tank2.position.set(5, 0.5, 0);
+scene.add(tank2);
+
+// Árboles realistas (simples pero con colores apropiados)
+function createTree(x, z) {
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4b3a2f });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2, 8), trunkMat);
+  trunk.position.y = 1;
+
+  const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2c5e2e });
+  const leaves = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), leavesMat);
+  leaves.position.y = 2.5;
+
+  const tree = new THREE.Group();
+  tree.add(trunk);
+  tree.add(leaves);
+  tree.position.set(x, 0, z);
+
+  scene.add(tree);
+}
+
+for (let i = 0; i < 20; i++) {
+  createTree(Math.random() * 100 - 50, Math.random() * 100 - 50);
+}
+
+// Rocas realistas
+function createRock(x, z) {
+  const rockMat = new THREE.MeshStandardMaterial({
+    color: 0x444444,
+    roughness: 0.9,
+    metalness: 0.1
+  });
+
+  const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(Math.random() + 0.5, 1), rockMat);
+  rock.position.set(x, 0.3, z);
+  rock.castShadow = true;
+  scene.add(rock);
+}
+
+for (let i = 0; i < 15; i++) {
+  createRock(Math.random() * 100 - 50, Math.random() * 100 - 50);
+}
+
+// Cámara
+camera.position.set(0, 15, 20);
+camera.lookAt(0, 0, 0);
+
+// Animación
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+animate();
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Juego Multijugador de Guerra 3D - Paisaje Mejorado con Luz</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: #202830;
+    font-family: 'Orbitron', sans-serif;
+    color: #0f0;
+  }
+  #overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 320px;
+    padding: 12px;
+    background: rgba(0,0,0,0.85);
+    border: 2px solid #0f0;
+    border-radius: 10px;
+    user-select: none;
+    font-weight: bold;
+    font-size: 16px;
+    line-height: 1.5;
+    box-shadow: 0 0 20px #0f0;
+    z-index: 2;
+  }
+  #message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 40px;
+    font-weight: 900;
+    color: #0f0;
+    text-shadow:
+      0 0 15px #0f0,
+      0 0 30px #0f0,
+      0 0 45px #00ff00,
+      0 0 60px #00ff00;
+    display: none;
+    user-select: none;
+    background: rgba(0,0,0,0.9);
+    padding: 30px 50px;
+    border-radius: 18px;
+    box-shadow:
+      0 0 20px #0f0,
+      inset 0 0 10px #0f0;
+    z-index: 3;
+  }
+  canvas {
+    display: block;
+    outline: none;
+    position: relative;
+    z-index: 1;
+  }
+</style>
+</head>
+<body>
+  <div id="overlay" aria-label="Controles y estado de jugadores" role="region">
+    <div>Jugador 1 (Multicolor): <br>W/A/S/D para mover, Q/E para rotar, F para disparar</div>
+    <br>
+    <div>Jugador 2 (Rojo): <br>Flechas para mover, Coma/Periodo (&lt;/&gt;) para rotar, L para disparar</div>
+    <br>
+    <div><strong>Objetivo:</strong> Disparar al oponente hasta reducir su salud a 0.</div>
+  </div>
+  <div id="message" role="alert"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script>
+    let scene, camera, renderer;
+    let players = [];
+    let projectiles = [];
+    let clock;
+    const PLAYER_SPEED = 20;
+    const ROTATE_SPEED = Math.PI;
+
+    const message = document.getElementById('message');
+    const keys = {};
+
+    init();
+    animate();
+
+    function createMulticolorMaterial() {
+      const materials = [
+        new THREE.MeshStandardMaterial({color: 0xff0000, metalness: 0.8, roughness: 0.3}), 
+        new THREE.MeshStandardMaterial({color: 0x0000ff, metalness: 0.8, roughness: 0.3}), 
+        new THREE.MeshStandardMaterial({color: 0x00ff00, metalness: 0.8, roughness: 0.3}), 
+        new THREE.MeshStandardMaterial({color: 0xffff00, metalness: 0.8, roughness: 0.3}), 
+        new THREE.MeshStandardMaterial({color: 0xff00ff, metalness: 0.8, roughness: 0.3}), 
+        new THREE.MeshStandardMaterial({color: 0x00ffff, metalness: 0.8, roughness: 0.3})  
+      ];
+      return materials;
+    }
+
+    function createMulticolorTankMesh() {
+      const tank = new THREE.Group();
+
+      const hullGeom = new THREE.BoxGeometry(4, 1.8, 6);
+      hullGeom.clearGroups();
+      for(let i=0; i<6; i++){
+        hullGeom.addGroup(i*6, 6, i);
+      }
+      const hullMat = createMulticolorMaterial();
+      const hull = new THREE.Mesh(hullGeom, hullMat);
+      hull.castShadow = true;
+      hull.receiveShadow = true;
+      tank.add(hull);
+
+      const turretBaseGeom = new THREE.CylinderGeometry(1.4, 1.4, 0.8, 32);
+      const turretBaseMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        metalness: 0.9,
+        roughness: 0.1,
+        emissive: 0x6699ff,
+        emissiveIntensity: 0.5
+      });
+      const turretBase = new THREE.Mesh(turretBaseGeom, turretBaseMat);
+      turretBase.position.set(0, 1.3, 0);
+      turretBase.castShadow = true;
+      turretBase.receiveShadow = true;
+      tank.add(turretBase);
+
+      const barrelGeom = new THREE.CylinderGeometry(0.35, 0.35, 5, 20);
+      const barrelMat = new THREE.MeshStandardMaterial({
+        color: 0x00ffff,
+        metalness: 1.0,
+        roughness: 0.05,
+        emissive: 0x00ffff,
+        emissiveIntensity: 0.9
+      });
+      const barrel = new THREE.Mesh(barrelGeom, barrelMat);
+      barrel.position.set(0, 1.55, 2.5);
+      barrel.rotation.x = Math.PI / 2;
+      barrel.castShadow = true;
+      barrel.receiveShadow = true;
+      turretBase.add(barrel);
+
+      const trackGeom = new THREE.BoxGeometry(1, 0.75, 6);
+      const trackMat = new THREE.MeshStandardMaterial({
+        color: 0x222222,
+        metalness: 0.95,
+        roughness: 0.4,
+        emissive: 0x003366,
+        emissiveIntensity: 0.15
+      });
+
+      const leftTrack = new THREE.Mesh(trackGeom, trackMat);
+      leftTrack.position.set(-2.6, -0.45, 0);
+      leftTrack.castShadow = true;
+      leftTrack.receiveShadow = true;
+      tank.add(leftTrack);
+
+      const rightTrack = new THREE.Mesh(trackGeom, trackMat);
+      rightTrack.position.set(2.6, -0.45, 0);
+      rightTrack.castShadow = true;
+      rightTrack.receiveShadow = true;
+      tank.add(rightTrack);
+
+      const treadGeom = new THREE.CylinderGeometry(0.18, 0.18, 0.8, 12);
+      const treadMat = new THREE.MeshStandardMaterial({
+        color: 0x555555,
+        metalness: 0.95,
+        roughness: 0.3,
+        emissive: 0x111111,
+        emissiveIntensity: 0.15
+      });
+      const treadsCount = 10;
+      for(let side = -1; side <= 1; side += 2){
+        for(let i=0; i<treadsCount; i++) {
+          const tread = new THREE.Mesh(treadGeom, treadMat);
+          tread.rotation.z = Math.PI / 2;
+          tread.position.x = side * 2.6;
+          tread.position.y = -0.45;
+          tread.position.z = (i - treadsCount/2) * 0.65;
+          tread.castShadow = true;
+          tread.receiveShadow = true;
+          tank.add(tread);
+        }
+      }
+
+      const antennaGeom = new THREE.CylinderGeometry(0.05, 0.05, 2, 8);
+      const antennaMat = new THREE.MeshStandardMaterial({
+        color: 0x0066cc,
+        metalness: 0.85,
+        roughness: 0.25,
+        emissive: 0x004499,
+        emissiveIntensity: 0.6
+      });
+      const antenna = new THREE.Mesh(antennaGeom, antennaMat);
+      antenna.position.set(0.8, 2.2, -1.2);
+      antenna.castShadow = true;
+      antenna.receiveShadow = true;
+      tank.add(antenna);
+
+      return {tank, turretBase, barrel};
+    }
+
+    function createRedTankMesh() {
+      const tank = new THREE.Group();
+
+      const hullGeom = new THREE.BoxGeometry(4, 1.8, 6);
+      const hullMat = new THREE.MeshStandardMaterial({
+        color: 0xff4444,
+        metalness: 0.8,
+        roughness: 0.3,
+        emissive: new THREE.Color(0xff4444).multiplyScalar(0.15),
+        emissiveIntensity: 0.4
+      });
+      const hull = new THREE.Mesh(hullGeom, hullMat);
+      hull.castShadow = true;
+      hull.receiveShadow = true;
+      tank.add(hull);
+
+      const turretBaseGeom = new THREE.CylinderGeometry(1.4, 1.4, 0.8, 32);
+      const turretBaseMat = new THREE.MeshStandardMaterial({
+        color: 0xcc1111,
+        metalness: 0.9,
+        roughness: 0.2,
+        emissive: new THREE.Color(0xcc1111).multiplyScalar(0.3),
+        emissiveIntensity: 0.6
+      });
+      const turretBase = new THREE.Mesh(turretBaseGeom, turretBaseMat);
+      turretBase.position.set(0, 1.3, 0);
+      turretBase.castShadow = true;
+      turretBase.receiveShadow = true;
+      tank.add(turretBase);
+
+      const barrelGeom = new THREE.CylinderGeometry(0.35, 0.35, 5, 20);
+      const barrelMat = new THREE.MeshStandardMaterial({
+        color: 0xdd4444,
+        metalness: 0.95,
+        roughness: 0.1,
+        emissive: new THREE.Color(0xdd4444).multiplyScalar(0.6),
+        emissiveIntensity: 0.8
+      });
+      const barrel = new THREE.Mesh(barrelGeom, barrelMat);
+      barrel.position.set(0, 1.55, 2.5);
+      barrel.rotation.x = Math.PI / 2;
+      barrel.castShadow = true;
+      barrel.receiveShadow = true;
+      turretBase.add(barrel);
+
+      const trackGeom = new THREE.BoxGeometry(1, 0.75, 6);
+      const trackMat = new THREE.MeshStandardMaterial({
+        color: 0x330000,
+        metalness: 0.9,
+        roughness: 0.4,
+        emissive: 0x220000,
+        emissiveIntensity: 0.15
+      });
+
+      const leftTrack = new THREE.Mesh(trackGeom, trackMat);
+      leftTrack.position.set(-2.6, -0.45, 0);
+      leftTrack.castShadow = true;
+      leftTrack.receiveShadow = true;
+      tank.add(leftTrack);
+
+      const rightTrack = new THREE.Mesh(trackGeom, trackMat);
+      rightTrack.position.set(2.6, -0.45, 0);
+      rightTrack.castShadow = true;
+      rightTrack.receiveShadow = true;
+      tank.add(rightTrack);
+
+      const treadGeom = new THREE.CylinderGeometry(0.18, 0.18, 0.8, 12);
+      const treadMat = new THREE.MeshStandardMaterial({
+        color: 0x660000,
+        metalness: 0.95,
+        roughness: 0.3,
+        emissive: 0x330000,
+        emissiveIntensity: 0.15
+      });
+      const treadsCount = 10;
+      for(let side = -1; side <= 1; side += 2){
+        for(let i=0; i<treadsCount; i++) {
+          const tread = new THREE.Mesh(treadGeom, treadMat);
+          tread.rotation.z = Math.PI / 2;
+          tread.position.x = side * 2.6;
+          tread.position.y = -0.45;
+          tread.position.z = (i - treadsCount/2) * 0.65;
+          tread.castShadow = true;
+          tread.receiveShadow = true;
+          tank.add(tread);
+        }
+      }
+
+      const antennaGeom = new THREE.CylinderGeometry(0.05, 0.05, 2, 8);
+      const antennaMat = new THREE.MeshStandardMaterial({
+        color: 0x660000,
+        metalness: 0.7,
+        roughness: 0.4,
+        emissive: 0x440000,
+        emissiveIntensity: 0.6
+      });
+      const antenna = new THREE.Mesh(antennaGeom, antennaMat);
+      antenna.position.set(0.8, 2.2, -1.2);
+      antenna.castShadow = true;
+      antenna.receiveShadow = true;
+      tank.add(antenna);
+
+      return {tank, turretBase, barrel};
+    }
+
+    // Tree helper function
+    function createTree() {
+      const tree = new THREE.Group();
+
+      const trunkGeom = new THREE.CylinderGeometry(0.3, 0.5, 3, 8);
+      const trunkMat = new THREE.MeshLambertMaterial({color: 0x552a00});
+      const trunk = new THREE.Mesh(trunkGeom, trunkMat);
+      trunk.position.y = 1.5;
+      trunk.castShadow = true;
+      tree.add(trunk);
+
+      const leavesGeom = new THREE.ConeGeometry(1.5, 4, 8);
+      const leavesMat = new THREE.MeshLambertMaterial({color: 0x007700});
+      const leaves = new THREE.Mesh(leavesGeom, leavesMat);
+      leaves.position.y = 4;
+      leaves.castShadow = true;
+      tree.add(leaves);
+
+      return tree;
+    }
+
+    // Rock helper function
+    function createRock() {
+      const rockGeom = new THREE.IcosahedronGeometry(1.2, 0);
+      const rockMat = new THREE.MeshLambertMaterial({color: 0x555555});
+      const rock = new THREE.Mesh(rockGeom, rockMat);
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      return rock;
+    }
+
+    function init(){
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x444466);  // Soft dusk-like blue
+
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 60, 70);
+      camera.lookAt(0,0,0);
+
+      renderer = new THREE.WebGLRenderer({antialias:true});
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      document.body.appendChild(renderer.domElement);
+
+      const ambientLight = new THREE.AmbientLight(0x555555, 0.8);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffeecc, 1);
+      directionalLight.position.set(40, 80, 40);
+      directionalLight.castShadow = true;
+      directionalLight.shadow.mapSize.width = 2048;
+      directionalLight.shadow.mapSize.height = 2048;
+      directionalLight.shadow.camera.left = -50;
+      directionalLight.shadow.camera.right = 50;
+      directionalLight.shadow.camera.top = 50;
+      directionalLight.shadow.camera.bottom = -50;
+      scene.add(directionalLight);
+
+      const fillLight = new THREE.HemisphereLight(0x8888cc, 0x443322, 0.4);
+      scene.add(fillLight);
+
+      const terrainSize = 100;
+      const treeCount = 30;
+      const rockCount = 15;
+
+      const planeGeometry = new THREE.PlaneGeometry(terrainSize, terrainSize, 40, 40);
+      const planeMaterial = new THREE.MeshLambertMaterial({color: 0x334422});
+      const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+      plane.rotation.x = -Math.PI / 2;
+      plane.receiveShadow = true;
+      scene.add(plane);
+
+      const gridHelper = new THREE.GridHelper(terrainSize, 30, 0x222222, 0x444444);
+      scene.add(gridHelper);
+
+      // Add randomly placed trees and rocks
+      for(let i=0; i<treeCount; i++){
+        const tree = createTree();
+        tree.position.set(
+          (Math.random() - 0.5) * terrainSize * 0.9,
+          0,
+          (Math.random() - 0.5) * terrainSize * 0.9
+        );
+        scene.add(tree);
+      }
+      for(let i=0; i<rockCount; i++){
+        const rock = createRock();
+        rock.position.set(
+          (Math.random() - 0.5) * terrainSize * 0.9,
+          0.6,
+          (Math.random() - 0.5) * terrainSize * 0.9
+        );
+        scene.add(rock);
+      }
+
+      // Tanks setup
+      const player1Obj = createMulticolorTankMesh();
+      player1Obj.tank.position.set(-15, 0.9, 0);
+      player1Obj.tank.castShadow = true;
+      player1Obj.tank.receiveShadow = true;
+      scene.add(player1Obj.tank);
+
+      const player2Obj = createRedTankMesh();
+      player2Obj.tank.position.set(15, 0.9, 0);
+      player2Obj.tank.rotation.y = Math.PI;
+      player2Obj.tank.castShadow = true;
+      player2Obj.tank.receiveShadow = true;
+      scene.add(player2Obj.tank);
+
+      players.push({
+        tankGroup: player1Obj.tank,
+        turret: player1Obj.turretBase,
+        barrel: player1Obj.barrel,
+        position: player1Obj.tank.position.clone(),
+        rotationY: 0,
+        health: 100,
+        lastShotTime: 0,
+        color: 'multicolor',
+      });
+
+      players.push({
+        tankGroup: player2Obj.tank,
+        turret: player2Obj.turretBase,
+        barrel: player2Obj.barrel,
+        position: player2Obj.tank.position.clone(),
+        rotationY: Math.PI,
+        health: 100,
+        lastShotTime: 0,
+        color: 'red',
+      });
+
+      window.addEventListener('keydown', e => { keys[e.code] = true; });
+      window.addEventListener('keyup', e => { keys[e.code] = false; });
+      window.addEventListener('resize', onWindowResize);
+
+      clock = new THREE.Clock();
+    }
+
+    function onWindowResize(){
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate(){
+      requestAnimationFrame(animate);
+
+      let delta = clock.getDelta();
+
+      updatePlayer(players[0], delta, {
+        forward: keys['KeyW'],
+        backward: keys['KeyS'],
+        left: keys['KeyA'],
+        right: keys['KeyD'],
+        rotateLeft: keys['KeyQ'],
+        rotateRight: keys['KeyE'],
+        shoot: keys['KeyF']
+      });
+
+      updatePlayer(players[1], delta, {
+        forward: keys['ArrowUp'],
+        backward: keys['ArrowDown'],
+        left: keys['ArrowLeft'],
+        right: keys['ArrowRight'],
+        rotateLeft: keys['Comma'],
+        rotateRight: keys['Period'],
+        shoot: keys['KeyL']
+      });
+
+      updateProjectiles(delta);
+
+      renderer.render(scene,camera);
+    }
+
+    function updatePlayer(player, delta, input){
+      if(player.health <= 0) return;
+
+      let moveZ = 0;
+      if(input.forward) moveZ -= PLAYER_SPEED * delta;
+      if(input.backward) moveZ += PLAYER_SPEED * delta;
+
+      let moveX = 0;
+      if(input.left) moveX -= PLAYER_SPEED * delta;
+      if(input.right) moveX += PLAYER_SPEED * delta;
+
+      if(input.rotateLeft) player.rotationY += ROTATE_SPEED * delta;
+      if(input.rotateRight) player.rotationY -= ROTATE_SPEED * delta;
+
+      player.tankGroup.rotation.y = player.rotationY;
+
+      let forwardVector = new THREE.Vector3(Math.sin(player.rotationY), 0, Math.cos(player.rotationY));
+      let rightVector = new THREE.Vector3(Math.sin(player.rotationY - Math.PI/2), 0, Math.cos(player.rotationY - Math.PI/2));
+
+      player.position.add(forwardVector.multiplyScalar(moveZ));
+      player.position.add(rightVector.multiplyScalar(moveX));
+
+      player.position.x = Math.min(48, Math.max(-48, player.position.x));
+      player.position.z = Math.min(48, Math.max(-48, player.position.z));
+
+      player.tankGroup.position.copy(player.position);
+
+      let now = performance.now();
+      if(input.shoot && (now - player.lastShotTime) > 500){
+        shootProjectile(player);
+        player.lastShotTime = now;
+      }
+    }
+
+    class Projectile3D {
+      constructor(position, direction, owner) {
+        const geom = new THREE.SphereGeometry(0.4, 16,16);
+        const matColor = owner.color === 'red' ? 0xff4444 : 0x00ffff;
+        const mat = new THREE.MeshStandardMaterial({
+          color: matColor,
+          emissive: matColor,
+          emissiveIntensity: 0.7,
+          metalness: 0.6,
+          roughness: 0.3,
+        });
+        this.mesh = new THREE.Mesh(geom, mat);
+        this.position = position.clone();
+        this.direction = direction.clone().normalize();
+        this.speed = 60;
+        this.owner = owner;
+        this.active = true;
+        this.mesh.position.copy(this.position);
+        this.mesh.castShadow = true;
+        scene.add(this.mesh);
+        this.lifeTime = 3000;
+        this.spawnTime = performance.now();
+      }
+      update(delta){
+        if(!this.active) return;
+        this.position.addScaledVector(this.direction, this.speed * delta);
+        this.mesh.position.copy(this.position);
+
+        if(this.position.x < -50 || this.position.x > 50 || this.position.z < -50 || this.position.z > 50){
+          this.destroy();
+          return;
+        }
+
+        if(performance.now() - this.spawnTime > this.lifeTime){
+          this.destroy();
+          return;
+        }
+
+        for(let p of players){
+          if(p === this.owner || p.health <= 0) continue;
+          const dist = p.position.distanceTo(this.position);
+          if(dist < 3.5){
+            p.health -= 12;
+            if(p.health < 0) p.health = 0;
+            this.destroy();
+            checkGameOver();
+            break;
+          }
+        }
+      }
+      destroy(){
+        this.active = false;
+        scene.remove(this.mesh);
+      }
+    }
+
+    function shootProjectile(player){
+      let forward = new THREE.Vector3(Math.sin(player.rotationY), 0, Math.cos(player.rotationY));
+      let pos = player.position.clone().add(forward.clone().multiplyScalar(3.5));
+      projectiles.push(new Projectile3D(pos, forward, player));
+    }
+
+    function updateProjectiles(delta){
+      for(let i = projectiles.length-1; i>= 0; i--){
+        if(projectiles[i].active){
+          projectiles[i].update(delta);
+        } else {
+          projectiles.splice(i,1);
+        }
+      }
+    }
+
+    function checkGameOver(){
+      if(players[0].health <= 0 && players[1].health <= 0){
+        showMessage('¡Empate!');
+      } else if(players[0].health <= 0){
+        showMessage('¡Jugador 2 gana!');
+      } else if(players[1].health <= 0){
+        showMessage('¡Jugador 1 gana!');
+      }
+    }
+
+    function showMessage(text){
+      message.textContent = text + ' Presiona R para reiniciar.';
+      message.style.display = 'block';
+    }
+
+    window.addEventListener('keydown', (e)=>{
+      if(e.code === 'KeyR'){
+        if(players.some(p => p.health <= 0)){
+          players.forEach((p,i) => {
+            p.health = 100;
+            p.position.set(i === 0 ? -15 : 15, 0.9, 0);
+            p.rotationY = i === 0 ? 0 : Math.PI;
+            p.tankGroup.position.copy(p.position);
+            p.tankGroup.rotation.y = p.rotationY;
+          });
+          projectiles.forEach(p => p.destroy());
+          projectiles = [];
+          message.style.display = 'none';
+        }
+      }
+    });
+  </script>
+</body>
+</html>
+const hullMat = new THREE.MeshStandardMaterial({
+  color: 0x3b4c39,        // Verde oliva oscuro
+  metalness: 0.4,
+  roughness: 0.7
+});
+const hullMat = new THREE.MeshStandardMaterial({
+  color: 0x4a3b3b,        // Gris oscuro-marrón
+  metalness: 0.4,
+  roughness: 0.8
+});
